@@ -1,0 +1,5 @@
+sftp-config.json
+data/*
+save/*
+test_ref.txt
+*.pyc
