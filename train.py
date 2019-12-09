@@ -12,12 +12,13 @@ import random
 import numpy as np
 import os
 import pickle
-from YYYTools.timer import Timer
+from YTools.universe.timer import Timer
+from tqdm import tqdm
 
 if C.log_file_name:
 	if os.path.exists(C.save):
-		input ("Save dir exists. Cover it? <CTRL-C> for no , <Enter> for yes")
-	else: os.makedirs(C.save , exist_ok = True)
+		os.system("rm -rf %s" % C.save)
+	os.makedirs(C.save , exist_ok = True)
 
 	log_fil = open(C.log_file_name , "w")
 
@@ -50,22 +51,11 @@ def pad_string(string , pad_idx = 0):
 
 	return string
 
-def get_a_batch(data , batch_start , device = None):
+def get_a_batch(data , batch_n , device = None):
 	if device is None:
 		device = C.gpus[0]
 
-	batch_length_per_gpu = C.batch_length // len(C.gpus)
-
-	got_length = 0
-	batch_end = batch_start
-	while batch_end < len(data):
-		now_length = len(data[batch_end]["decoder_inp"])
-		if now_length + got_length > batch_length_per_gpu:
-			break
-		got_length += now_length
-		batch_end  += 1
-
-	dat = data[batch_start : batch_end]
+	dat = data[batch_n * C.batch_size : (batch_n+1) * C.batch_size]
 
 	g 			= dgl.batch ([x["g"				] for x in dat]) 
 	title 		= pad_string([x["title"			] for x in dat])
@@ -101,7 +91,6 @@ def get_a_batch(data , batch_start , device = None):
 	return (
 		[g , title , ent_names , ent_lens , rels , ent_idx , rel_idx , glob_idx , decoder_inp , ent_idx_b] , 
 		gold , 
-		batch_end ,
 	)
 
 def valid(net):
@@ -113,18 +102,18 @@ def valid(net):
 	valid_data = data[C.dev_data]
 	step = 0
 	tot_loss = 0
-	batch_end = 0
-	while batch_end < len(valid_data):
+	batch_number = (len(valid_data) // C.batch_size) + int((len(valid_data) % C.batch_size) != 0)
+	pbar = tqdm(range(batch_number) , ncols = 70)
+	for batch_n in pbar:
+		pbar.set_description_str("(Test)")
 
 		#-----------------get data-----------------
 		inputs = []
 		golds = []
 		for data_device in C.gpus:
-			inp , gold , batch_end = get_a_batch(valid_data , batch_end , data_device)
+			inp , gold = get_a_batch(valid_data , batch_number , data_device)
 			inputs.append(inp)
 			golds.append(gold)
-			if batch_end >= len(valid_data):
-				break
 		assert len(inputs) == len(golds)
 		#------------------repadding-----------------
 
@@ -160,11 +149,9 @@ def valid(net):
 
 		step += 1
 		
-		del loss
-		del y
-	tot_loss /= step
+		pbar.set_postfix_str("loss: %.4f , avg_loss: %.4f" % (float(loss) , tot_loss / step))
 
-	lprint ("valid end. valid loss = %.6f , ppl = %.6f" % (tot_loss , math.exp(tot_loss)))
+	lprint ("valid end. valid loss = %.6f , ppl = %.6f" % (tot_loss / step , math.exp(tot_loss)))
 	#net = net.train()
 
 def train(net):
@@ -190,8 +177,7 @@ def train(net):
 	step = 0
 	
 	tot_loss = 0
-	tot_length = sum([len(x["decoder_inp"]) for x in train_data])
-	batch_number = tot_length // C.batch_length
+	batch_number = (len(train_data) // C.batch_size) + int((len(train_data) % C.batch_size) != 0)
 	#accumued_loss = None
 	for epoch_n in range(C.epoch_number):
 
@@ -201,20 +187,18 @@ def train(net):
 		lprint ("epoch %d started." % (epoch_n))
 		lprint ("now lr = %.3f" % (optim.param_groups[0]['lr']))
 
-		batch_end = 0
-
-		while batch_end < len(train_data):
+		pbar = tqdm(range(batch_number) , ncols = 70)
+		for batch_n in pbar:
+			pbar.set_description_str("(Train)Epoch %d" % (epoch_n+1))
 
 			#-----------------get data-----------------
 			inputs = []
 			golds = []
 			for data_device in C.gpus:
-				inp , gold , batch_end = get_a_batch(train_data , batch_end , data_device)
+				inp , gold = get_a_batch(train_data , batch_n , data_device)
 				inputs.append(inp)
 				golds.append(gold)
-				if batch_end >= len(train_data):
-					break
-			assert len(inputs) == len(golds)
+
 			#------------------repadding-----------------
 
 			maxlen_gold = max([ max( [len(x) for x in gold] ) for gold in golds])
@@ -265,16 +249,8 @@ def train(net):
 				#del accumued_loss
 				#accumued_loss = None
 
-			#-----------------log-----------------
+			pbar.set_postfix_str("loss: %.4f , avg_loss: %.4f" % (float(loss) , tot_loss / step))
 
-			if step % C.print_step == 0:
-				#print (Timer.output_all())
-				tot_step = C.epoch_number * batch_number
-				ratio = step / tot_step
-				lprint ("now step %d (%.2f%%) , (time = %.2fs) , train loss = %.6f" % 
-					(step , ratio * 100 , gettime() , float(tot_loss) / C.print_step )
-				)
-				tot_loss = 0
 			
 		lprint ("epoch %d ended." % (epoch_n))
 		valid(net)

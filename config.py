@@ -24,10 +24,10 @@ parser.add_argument("--force_reprocess" , default = False 		, action 	= "store_t
 
 #training procedure control
 parser.add_argument("--epoch_number"	, default = 20 			, type 		= int)
-parser.add_argument("--batch_length"	, default = 2000 		, type 		= int)
+parser.add_argument("--batch_size"		, default = 8 			, type 		= int)
 
 #gradient desent control
-parser.add_argument("--clip" 			, default = 1. 	 		, type 		= float)
+parser.add_argument("--clip" 			, default = 1. 			, type 		= float)
 
 parser.add_argument("--use_adam"		, default = False 		, action 	= "store_true")
 parser.add_argument("--lr" 				, default = 1e-3 		, type 		= float)
@@ -37,9 +37,6 @@ parser.add_argument("--low_lr"			, default = 0.05 		, type 		= int)
 parser.add_argument("--lr_cyc"			, default = 5 			, type 		= int)
 
 parser.add_argument("--update_freq"		, default = 1 			, type 		= int)
-
-#log
-parser.add_argument("--print_step" 		, default = 100 		, type 		= int)
 
 #generate parameters
 parser.add_argument("--beam_norm" 		, default = False 		, action 	= "store_true")

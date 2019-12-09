@@ -29,50 +29,31 @@ class StringEncoder(nn.Module):
 
 		return y
 
-class DecoderAttention(nn.Module):
-	def __init__(self , d_model = 500, h = 4 , dropout = 0.0):
-		super().__init__()
-
-		self.h = h
-		self.d_model = d_model
-		self.dk = d_model // h
-
-		self.attn = MultiheadAttention(d_model = d_model , h = h , dropout = dropout , actions = "")
-		self.WQ = nn.Linear(d_model , d_model , bias = False)
-		self.WK = nn.Linear(d_model , d_model , bias = False)
-		self.WV = nn.Linear(d_model , d_model , bias = False)
-		self.WO = nn.Linear(d_model , d_model , bias = False)
-
-	def forward(self , query , g , glob_idx):
-		'''
-			query: (bsz , d_model)
-			g.ndata["x"] : (n_v , d_model)
-		'''
-		g.ndata["k"] = self.WK(g.ndata["x"]).view(-1 , self.h , self.dk)
-		g.ndata["v"] = self.WV(g.ndata["x"]).view(-1 , self.h , self.dk)
-
-		g.ndata["q"][glob_idx] = self.WQ(query).view(len(glob_idx) , self.h , self.dk)
-
-		g = self.attn(g)
-		r = self.WO(g.ndata["x"][glob_idx].view(-1 , self.d_model))
-		
-		return r
-
-
 class EntitySelector(nn.Module):
-	def __init__(self , d_model):
+	def __init__(self , d_model , give_me_result = False):
 		super().__init__()
 		self.d_model = d_model
-		self.WQ = nn.Linear(2*d_model , d_model)
+		self.WQ = nn.Linear(d_model , d_model)
 		self.WK = nn.Linear(d_model , d_model)
+
+		self.give_me_result = give_me_result
+
+		if give_me_result:
+			self.WV = nn.Linear(d_model , d_model)
+			self.WO = nn.Linear(d_model , d_model)
+			self.l_norm = nn.LayerNorm(d_model)
 		
 	def forward(self , query , g , ent_idx_in_batch , max_entity_number):
 		'''
-			query: (bsz , d_model)
+			query: (bsz , len , d_model)
 
 			ent_idx_in_batch: form graph nodes of entitys to shape (bsz , n_ent_b)
 		'''
-		bsz , y_len , d_model = query.size(0) , query.size(1) , self.d_model
+		bsz , d_model = query.size(0) , self.d_model
+		query = query.view(bsz , -1 , d_model)
+		y_len = query.size(1)
+
+
 		n_ent_b = ent_idx_in_batch.size(1)
 		mask = (ent_idx_in_batch != -1).float().view(bsz , n_ent_b , 1).requires_grad_(False)
 		
@@ -83,8 +64,18 @@ class EntitySelector(nn.Module):
 
 		weight = (q.view(bsz,y_len,1,d_model) * ent.view(bsz,1,n_ent_b,d_model)).sum(-1) #(bsz , y_len , n_ent_b)
 		weight -= (1-mask.view(bsz,1,n_ent_b)) * 100000
-		weight = F.softmax(weight , dim = -1)
+		weight = F.softmax(weight , dim = -1) #(bsz , y_len , n_ent_b)
 
+		#if need result, make a weighted sum
+		if self.give_me_result:
+			v = self.WK(g.ndata["x"][ent_idx_in_batch]) * mask #(bsz , n_ent_b , d_model)
+			weight = weight.view(bsz , y_len , 1 , n_ent_b)
+			v = v.view(bsz , 1 , n_ent_b , d_model)
+			v = tc.matmul(weight * (d_model**-0.5) , v)
+			v = self.l_norm(self.WO(v))
+			return v
+
+		#else, make weight padded and return it
 		if n_ent_b < max_entity_number:
 			weight = tc.cat([weight , weight.new_zeros(bsz , y_len , max_entity_number - n_ent_b)] , dim = -1)
 
@@ -114,10 +105,11 @@ class GraphWriter(nn.Module):
 
 		self.y_embedder = self.emb
 		self.decode_cell = nn.LSTMCell(2*d_model , d_model)
-		self.decoder_attn = DecoderAttention(d_model = d_model , h = 4 , dropout = dropout)
+		self.out_ln = nn.Linear(2 * d_model , d_model)
+		self.decoder_attn = EntitySelector(d_model , give_me_result = True)
 
-		self.switch = nn.Linear(2 * d_model , 1)
-		self.select_vocab  = nn.Linear(2 * d_model , len(vocab) - entity_number)
+		self.switch = nn.Linear(d_model , 1)
+		self.select_vocab  = nn.Linear(d_model , len(vocab) - entity_number)
 		self.select_entity = EntitySelector(d_model)
 		#self.select_entity = nn.Linear(2 * d_model , entity_number)
 
@@ -176,17 +168,17 @@ class GraphWriter(nn.Module):
 		for i in range(y_len):
 			inp = tc.cat([y_emb[i] , a] , dim = -1)
 			h,c = self.decode_cell(inp , (h,c))
-			a = self.decoder_attn(h , g , glob_idx)
+			a = self.decoder_attn(h , g , ent_idx_b , self.entity_number).view(bsz , d_model)
 			y = tc.cat([h , a] , dim = -1)
 			output.append(y)
 		
 		output = tc.stack(output , 1) #(bsz , y_len , 2*d_model)
+		output = F.relu(self.out_ln(output))
 
 		p = tc.sigmoid(self.switch(output)) #propobility for selecting entity
 
 		select_v = tc.softmax(self.select_vocab (output) , dim = -1)
 		select_e = self.select_entity(output , g , ent_idx_b , self.entity_number)
-		#select_e = tc.softmax(self.select_entity(output) , dim = -1)
 
 		out = tc.cat([select_v * (1-p) , select_e * p] , dim = -1)
 		if self.sort_idx.device != out.device:
@@ -269,7 +261,7 @@ class GraphWriter(nn.Module):
 
 				inp = tc.cat([y_emb , a] , dim = -1)
 				h,c = self.decode_cell(inp , (h,c))
-				a = self.decoder_attn(h , g , glob_idx)
+				a = self.decoder_attn(h , g)
 				y = tc.cat([h , a] , dim = -1) 	#(1 , 2*d_model)
 
 				p = tc.sigmoid(self.switch(y)) #propobility for selecting entity
