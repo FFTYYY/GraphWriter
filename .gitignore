@@ -3,3 +3,4 @@ data/*
 save/*
 test_ref.txt
 *.pyc
+note.txt
