@@ -111,7 +111,7 @@ def valid(net):
 		inputs = []
 		golds = []
 		for data_device in C.gpus:
-			inp , gold = get_a_batch(valid_data , batch_number , data_device)
+			inp , gold = get_a_batch(valid_data , batch_n , data_device)
 			inputs.append(inp)
 			golds.append(gold)
 		assert len(inputs) == len(golds)
@@ -151,7 +151,7 @@ def valid(net):
 		
 		pbar.set_postfix_str("loss: %.4f , avg_loss: %.4f" % (float(loss) , tot_loss / step))
 
-	lprint ("valid end. valid loss = %.6f , ppl = %.6f" % (tot_loss / step , math.exp(tot_loss)))
+	lprint ("valid end. valid loss = %.6f , ppl = %.6f" % (tot_loss / step , math.exp(tot_loss / step)))
 	#net = net.train()
 
 def train(net):
