@@ -222,6 +222,8 @@ class Decoder(nn.Module):
 	def __init__(self , num_layers = 4 , d_model = 500 , d_hid = 1024 , h = 5 , drop_p = 0.1 , extra_layers = []):
 		super(Decoder, self).__init__()
 
+		self.pos_emb = nn.Parameter(tc.zeros(512 , d_model))
+
 		self.dec_layer = nn.ModuleList([
 			Decoder_Layer(d_model = d_model , d_hid = d_hid , h = h , drop_p = drop_p , extra_layers = extra_layers) 
 			for _ in range(num_layers)
@@ -235,6 +237,7 @@ class Decoder(nn.Module):
 	def reset_parameters(self):
 		for x in self.dec_layer:
 			x.reset_parameters()
+		nn.init.normal_( self.pos_emb.weight.data , 0 , 0.01)
 
 	def forward(self , x , seq_mas , att_mas = None , select_params = None):
 		'''
@@ -248,6 +251,8 @@ class Decoder(nn.Module):
 		if att_mas is None:
 			att_mas = 1
 		att_mas = att_mas * tc.tril(x.new_ones(bs,n,n))
+
+		x = x + self.pos_emb[:n,:].view(1,n,d)
 
 		for i in range(self.num_layers):
 			x = self.dec_layer[i](x  ,seq_mas , att_mas , select_params = select_params) #(bs , len , d_model)

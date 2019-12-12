@@ -14,6 +14,7 @@ import os
 import pickle
 from YTools.universe.timer import Timer
 from tqdm import tqdm
+from transformers.optimization import WarmupLinearSchedule , WarmupCosineSchedule
 
 if C.log_file_name:
 	if os.path.exists(C.save):
@@ -155,34 +156,22 @@ def valid(net):
 	#net = net.train()
 
 def train(net):
-
-	def lr_schedule(epoch_number , optim):
-		if C.no_lr_cyc or C.lr_cyc <= 1:
-			return
-		epoch_number += 4
-		lr = C.high_lr - (epoch_number % C.lr_cyc) * ((C.high_lr - C.low_lr) / (C.lr_cyc-1))
-		optim.param_groups[0]['lr'] = lr
  
 	train_starttime = gettime()
 
-	#optim = tc.optim.SGD(params = net.parameters() , lr = C.lr)
-	if C.use_adam:
-		optim = tc.optim.Adam(params = net.parameters() , lr = C.lr)
-	else:
-		optim = tc.optim.SGD(params = net.parameters() , lr = C.lr , momentum = 0.9)
+	train_data = data[C.train_data]
+	batch_number = (len(train_data) // C.batch_size) + int((len(train_data) % C.batch_size) != 0)
+
+
+	optim = tc.optim.Adam(params = net.parameters() , lr = C.lr)
+	sched = WarmupLinearSchedule(optim , warmup_steps = 400 , t_total = batch_number * C.epoch_number)
 
 	loss_func = nn.NLLLoss(ignore_index = 0)
 
-	train_data = data[C.train_data]
 	step = 0
-	
 	tot_loss = 0
-	batch_number = (len(train_data) // C.batch_size) + int((len(train_data) % C.batch_size) != 0)
 	#accumued_loss = None
 	for epoch_n in range(C.epoch_number):
-
-		if not C.use_adam:
-			lr_schedule(epoch_n , optim)
 
 		lprint ("epoch %d started." % (epoch_n))
 		lprint ("now lr = %.3f" % (optim.param_groups[0]['lr']))
@@ -245,6 +234,7 @@ def train(net):
 				loss.backward()
 				nn.utils.clip_grad_norm_(net.parameters(),C.clip)
 				optim.step()
+				sched.step()
 
 				#del accumued_loss
 				#accumued_loss = None

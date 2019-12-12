@@ -107,7 +107,7 @@ class GraphWriter(nn.Module):
 			self.sort_idx.to(out.device)
 		out = out[:,:,self.sort_idx]
 
-		out = out + out.new_ones(out.size()) * 1e-6	#avoid zeros
+		out = out + 1e-6	#avoid zeros
 
 		return out
 
@@ -179,17 +179,17 @@ class GraphWriter(nn.Module):
 				if got_tok in decoded_ent_replace:
 					got_tok = decoded_ent_replace[got_tok]
 
-				y_emb = self.y_embedder(tc.LongTensor([got_tok]).cuda(ent_emb.device)).view(1 , d_model)
+				decoder_inp = tc.LongTensor(toks).cuda(ent_emb.device).view(1,-1) 
 
-				inp = tc.cat([y_emb , a] , dim = -1)
-				h,c = self.decode_cell(inp , (h,c))
-				a = self.decoder_attn(h , g)
-				y = tc.cat([h , a] , dim = -1) 	#(1 , 2*d_model)
-
+				y_emb = self.y_embedder(decoder_inp) #(bsz , y_len , d_model)
+				y = self.decoder(y_emb , decoder_inp != 0 , select_params = [
+					[ent_emb , None , self.entity_number]
+				])[:,-1,:]
+				
 				p = tc.sigmoid(self.switch(y)) #propobility for selecting entity
 
 				select_v = tc.softmax(self.select_vocab (y) , dim = -1) #(1,len_voc)
-				select_e = self.select_entity(y.unsqueeze(0) , g , ent_idx.unsqueeze(0) , self.entity_number).squeeze(0)
+				select_e = self.select_entity(y.unsqueeze(0) , ent_emb , None , self.entity_number).squeeze(0)
 
 				out = tc.cat([select_v * (1-p) , select_e * p] , dim = -1) #(1 , len_vocab)
 				if self.sort_idx.device != out.device:
@@ -199,7 +199,7 @@ class GraphWriter(nn.Module):
 				#pdb.set_trace()
 
 
-				out = out + out.new_ones(out.size()) * 1e-6	#avoid zeros
+				#out = out + out.new_ones(out.size()) * 1e-6	#avoid zeros
 
 				#-----------beam--------------
 
@@ -217,7 +217,7 @@ class GraphWriter(nn.Module):
 						"log_prob" : n_log_prob,
 					})
 
-			if other_args.get("norm"):
+			if other_args.get("norm") and False:
 				new_ys.sort(key = lambda x:-(x["log_prob"] / len(x["toks"])))
 			else:
 				new_ys.sort(key = lambda x:-(x["log_prob"]))
