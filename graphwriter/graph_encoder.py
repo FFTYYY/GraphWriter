@@ -34,7 +34,7 @@ class MultiheadAttention(nn.Module):
 		'''
 
 		g.apply_edges(fn.u_mul_v('q', 'k', 'e'))
-		e = (g.edata['e'].sum(dim = -1 , keepdim = True)) / math.sqrt(self.dk)
+		e = (g.edata['e'].sum(dim = -1 , keepdim = True)) / (self.dk ** 0.5)
 		
 		g.edata['e'] = self.attn_drop(edge_softmax(g, e))
 

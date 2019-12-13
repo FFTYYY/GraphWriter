@@ -16,9 +16,9 @@ python eval.py ./save/test/gene.txt test_ref.txt
 ```
 ### Result
 
-Implementation| Bleu | METROR 
---------------|------|--------
-Original      | 14.3 | 18.8   
-This          | 12.5 | 17.5
+Implementation                | Bleu | METROR 
+--------------                |------|--------
+Original                      | 14.3 | 18.8   
+My(w/o transformer)           | 12.5 | 17.5
 
 好吧我还没有完全复现出他的结果(ノДＴ)

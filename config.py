@@ -30,10 +30,6 @@ parser.add_argument("--batch_size"		, default = 8 			, type 		= int)
 parser.add_argument("--clip" 			, default = 1. 			, type 		= float)
 
 parser.add_argument("--lr" 				, default = 1e-4 		, type 		= float)
-parser.add_argument("--no_lr_cyc"		, default = False 		, action 	= "store_true")
-parser.add_argument("--high_lr"			, default = 0.25 		, type 		= int)
-parser.add_argument("--low_lr"			, default = 0.05 		, type 		= int)
-parser.add_argument("--lr_cyc"			, default = 5 			, type 		= int)
 
 parser.add_argument("--update_freq"		, default = 1 			, type 		= int)
 

@@ -48,6 +48,7 @@ class EntitySelector(nn.Module):
 
 			ent_idx_in_batch: form graph nodes of entitys to shape (bsz , n_ent_b) , None if bsz = 1
 		'''
+
 		bsz , d_model = query.size(0) , self.d_model
 		query = query.view(bsz , -1 , d_model)
 		y_len = query.size(1)

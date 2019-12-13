@@ -47,6 +47,7 @@ def generate(net , data , vocab):
 	gene_fil = open(os.path.join(C.save , C.generated_file) , "w")
 
 	for d in range(len(data)):
+
 		x = data[d]
 		
 		decoded_ent_replace = {}
@@ -54,6 +55,8 @@ def generate(net , data , vocab):
 			if "<ent_" in vocab.idx2word[x["gold"][i]]:
 				 assert vocab.idx2word[x["decoder_inp"][i+1]] in ["<task>","<method>","<metric>","<material>","<otherscientificterm>",]
 				 decoded_ent_replace[x["gold"][i]] = x["decoder_inp"][i+1]
+
+		#pdb.set_trace()
 
 		with tc.no_grad():
 			y = net.generate(
@@ -71,6 +74,7 @@ def generate(net , data , vocab):
 				max_len 	= 200 , 
 				decoded_ent_replace = decoded_ent_replace , 
 				vocab = vocab , 
+				attn_method = C.attn_method , 
 				other_args = {
 					"norm" : C.beam_norm , 
 				}

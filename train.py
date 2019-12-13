@@ -170,11 +170,9 @@ def train(net):
 
 	step = 0
 	tot_loss = 0
-	#accumued_loss = None
 	for epoch_n in range(C.epoch_number):
 
 		lprint ("epoch %d started." % (epoch_n))
-		lprint ("now lr = %.3f" % (optim.param_groups[0]['lr']))
 
 		pbar = tqdm(range(batch_number) , ncols = 70)
 		for batch_n in pbar:
@@ -207,8 +205,6 @@ def train(net):
 				replicas = net.replicate(net.module, net.device_ids[:len(inputs)])
 				outputs = net.parallel_apply(replicas, inputs, [{"attn_method" :C.attn_method}] * len(inputs))
 
-				#pdb.set_trace()
-
 				y = tc.cat([x.to(C.gpus[0]) for x in outputs] , dim = 0)
 				gold = tc.cat([x.to(C.gpus[0]) for x in golds] , dim = 0)
 
@@ -219,25 +215,16 @@ def train(net):
 
 			tot_loss += float(loss)
 
-			#if accumued_loss is None:
-			#	accumued_loss = loss
-			#else:
-			#	accumued_loss += loss
-
 			step += 1
 			
 			#-----------------back prop-----------------
 			#if step % C.update_freq == 0:
 			if True:
 				optim.zero_grad()
-				#accumued_loss.backward()
 				loss.backward()
 				nn.utils.clip_grad_norm_(net.parameters(),C.clip)
 				optim.step()
 				sched.step()
-
-				#del accumued_loss
-				#accumued_loss = None
 
 			pbar.set_postfix_str("loss: %.4f , avg_loss: %.4f" % (float(loss) , tot_loss / step))
 

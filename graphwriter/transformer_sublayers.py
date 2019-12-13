@@ -113,31 +113,6 @@ class FFN(nn.Module):
 		x = x * mas
 		return x
 
-
-class Encoder_Layer(nn.Module):
-	def __init__(self , d_model = 512 , d_hid = 512 , h = 4 , drop_p = 0.0):
-		super(Encoder_Layer, self).__init__()
-
-		self.self_att = MultiHeadAttention(h = h , d_model = d_model , drop_p = drop_p)
-		self.layernorm_1 = nn.LayerNorm([d_model])
-		self.drop_1 = nn.Dropout(drop_p)
-
-		self.ffn = FFN(d_model = d_model , d_hid = d_hid , drop_p = drop_p)
-		self.layernorm_2 = nn.LayerNorm([d_model])
-		self.drop_2 = nn.Dropout(drop_p)
-
-	def forward(self, x , seq_mas , att_mas = None):
-
-		out1 = self.self_att(x , x , x , seq_mas , att_mas = att_mas)
-		x = self.layernorm_1(x + self.drop_1(out1))		
-		x *= seq_mas
-
-		out2 = self.ffn(x , seq_mas)
-		x = self.layernorm_2(x + self.drop_2(out2))
-		x *= seq_mas
-
-		return x
-
 class Decoder_Layer(nn.Module):
 	def __init__(self , d_model = 512 , d_hid = 512 , h = 4 , drop_p = 0.2 , extra_layers = []):
 		super(Decoder_Layer, self).__init__()
@@ -187,33 +162,6 @@ class Decoder_Layer(nn.Module):
 		out2 = self.ffn(x , seq_mas)
 		x = self.layernorm_2(x + self.drop_2(out2))
 		x *= seq_mas
-
-		return x
-
-class Encoder(nn.Module):
-	def __init__(self , num_layers = 4 , d_model = 500 , d_hid = 1024 , h = 5 , drop_p = 0.1):
-		super(Encoder, self).__init__()
-
-		self.enc_layer = nn.ModuleList([
-			Encoder_Layer(d_model = d_model , d_hid = d_hid , h = h , drop_p = drop_p) 
-			for _ in range(num_layers)
-		])
-
-		#-----hyper params-----
-		self.d_model = d_model
-		self.num_layers = num_layers
-
-	def forward(self , x , seq_mas , att_mas = None , ent_len = None):
-		'''
-			x : (bs , n , emb_siz)
-		'''
-		seq_mas = seq_mas.view(x.size(0) , x.size(1) , 1).float()
-		if att_mas is not None:
-			att_mas = att_mas.view(x.size(0) , x.size(1) , x.size(1)).float()
-
-		for i in range(self.num_layers):
-			x = self.enc_layer[i](x  ,seq_mas , att_mas) #(bs , len , d_model)
-
 
 		return x
 

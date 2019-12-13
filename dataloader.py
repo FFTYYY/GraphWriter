@@ -188,7 +188,7 @@ def run(name = "" , shuffle = True , force_reprocess = False):
 	for i in range(Con.max_entity_per_string):
 		_a[len(vocab)-Con.max_entity_per_string+i] = i+1
 	_a = _a[sort_idx]
-	assert (_a[ent_idx_v] == tc.arange(1,Con.max_entity_per_string + 1).float()).long().sum() == Con.max_entity_per_string
+	assert (_a[ent_idx_v] == tc.arange(1,Con.max_entity_per_string + 1)).all()
 
 	for data in [train_data , valid_data , test_data]:
 		data_index(data)
