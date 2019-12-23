@@ -170,7 +170,7 @@ class Decoder(nn.Module):
 	def __init__(self , num_layers = 4 , d_model = 500 , d_hid = 1024 , h = 5 , drop_p = 0.1 , extra_layers = []):
 		super(Decoder, self).__init__()
 
-		self.pos_emb = nn.Parameter(tc.zeros(512 , d_model))
+		self.pos_emb = nn.Parameter(tc.zeros(1024 , d_model))
 
 		self.dec_layer = nn.ModuleList([
 			Decoder_Layer(d_model = d_model , d_hid = d_hid , h = h , drop_p = drop_p , extra_layers = extra_layers) 

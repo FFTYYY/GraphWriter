@@ -20,5 +20,7 @@ Implementation                | Bleu | METROR
 --------------                |------|--------
 Original                      | 14.3 | 18.8   
 My(w/o transformer)           | 12.5 | 17.5
+My(w transformer)             | 12.2 | -
+My(w transformer,+ glove)     | 12.3 | -
 
 好吧我还没有完全复现出他的结果(ノДＴ)

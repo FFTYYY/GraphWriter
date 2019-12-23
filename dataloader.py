@@ -86,7 +86,7 @@ def make_graph(x):
 
 	return x
 
-vocab = Vocabulary(min_freq = 5)
+vocab = Vocabulary(min_freq = 2)
 
 def get_data(dataset_path , shuffle = True):
 
@@ -108,7 +108,9 @@ def get_data(dataset_path , shuffle = True):
 			ent_names 	= [x.strip().split(" ") for x in ent_names.strip().split(";")]
 			ent_types 	= [ent_type2num(x) for x in ent_types.strip().split(" ")]
 			rels 		= [[int(y) for y in x.strip().split(" ")] for x in rels.strip().split(";")]
-			gold 		= ["<SOS>"] + gold.strip().split(" ") + ["<EOS>"]
+
+			gold 		= gold.replace("-" , " - ").replace("/" , " / ").replace("\\" , " \\ ").strip().split(" ")
+			gold 		= ["<SOS>"] + gold + ["<EOS>"]
 			decoder_inp = [decoder_inp_process(x) for x in gold]
 			gold 		= [gold_process(x) for x in gold]
 
